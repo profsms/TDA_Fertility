@@ -1,0 +1,101 @@
+# ============================================================
+#  Credentials --- NEVER commit
+# ============================================================
+.env
+.env.*
+!.env.example
+
+# ============================================================
+#  Data --- downloaded and processed files are not versioned.
+#  Only the scripts that produce them are tracked.
+# ============================================================
+data/raw/
+data/processed/
+
+# ============================================================
+#  Output --- figures and tables are reproducible from scripts
+# ============================================================
+output/
+
+# ============================================================
+#  R
+# ============================================================
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rproj
+# packrat / renv
+packrat/lib*/
+packrat/src/
+renv/library/
+renv/python/
+renv/staging/
+.Rprofile
+
+# ============================================================
+#  Julia
+# ============================================================
+# Manifest is machine-specific; only Project.toml is tracked
+Manifest.toml
+# Coverage and profiling artifacts
+*.jl.cov
+*.jl.mem
+*.jl.*.cov
+# Compiled cache
+deps/deps.jl
+# Julia depot symlinks sometimes appear
+.julia/
+
+# ============================================================
+#  OS
+# ============================================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ============================================================
+#  Editors
+# ============================================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains (RubyMine, IntelliJ, etc.)
+.idea/
+*.iml
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+
+# ============================================================
+#  Misc
+# ============================================================
+__pycache__/
+*.py[cod]
+*.log
+*.tmp
+*.bak
+
