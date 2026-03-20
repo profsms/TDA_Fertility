@@ -90,7 +90,7 @@ p_diff <- ggplot2::ggplot(tfr_diff,
   ggplot2::labs(
     title   = "Annual TFR changes (first differences)",
     subtitle = "Blue = increase, Red = decrease",
-    x = "Year", y = "ΔTFR",
+    x = "Year", y = "dTFR",
     caption = "Sources: HFD, OECD"
   ) +
   ggplot2::theme_bw(base_size = 10)

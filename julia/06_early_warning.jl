@@ -31,10 +31,10 @@ sort!(tfr_panel, [:iso3, :year])
 #  |mean(before) - mean(after)| as the break year.
 #  Minimum segment length = 10 years.
 # ------------------------------------------------------------
-function detect_break(years, vals; min_seg=10)
+function detect_break(years, vals; min_seg=7)
     T = length(vals)
     T < 2 * min_seg && return missing, NaN
-    best_t  = missing
+    best_t   = missing
     best_dif = -Inf
     for t in min_seg:(T - min_seg)
         d = abs(mean(vals[1:t]) - mean(vals[(t+1):T]))
@@ -46,13 +46,22 @@ function detect_break(years, vals; min_seg=10)
     return best_t, best_dif
 end
 
+# Restrict TFR series to the years covered by WTFE before break detection,
+# so detected breaks are within the window where we can measure lead times.
+function restrict_to_wtfe_coverage(sub_tfr, sub_wtfe)
+    isempty(sub_wtfe) && return sub_tfr
+    yr_min = minimum(sub_wtfe.year)
+    yr_max = maximum(sub_wtfe.year)
+    filter(r -> r.year >= yr_min && r.year <= yr_max, sub_tfr)
+end
+
 # ------------------------------------------------------------
 #  WTFE decline detector:
 #  Find the last year before the TFR break where WTFE was
 #  at its rolling 5-year maximum, then measure the
 #  window until WTFE falls below 50% of that maximum.
 # ------------------------------------------------------------
-function wtfe_decline_onset(sub_wtfe, break_year; lookback=15)
+function wtfe_decline_onset(sub_wtfe, break_year; lookback=20)
     isempty(sub_wtfe) && return missing
     pre = filter(r -> r.year <= break_year &&
                       r.year >= break_year - lookback, sub_wtfe)
@@ -82,7 +91,11 @@ for cntry in countries
 
     cname = first(sub_wtfe.name)
 
-    break_yr, break_strength = detect_break(sub_tfr.year, sub_tfr.tfr)
+    # Only search for breaks within the years WTFE actually covers
+    sub_tfr_restricted = restrict_to_wtfe_coverage(sub_tfr, sub_wtfe)
+    break_yr, break_strength = isempty(sub_tfr_restricted) ?
+        (missing, NaN) :
+        detect_break(sub_tfr_restricted.year, sub_tfr_restricted.tfr)
     wtfe_onset = ismissing(break_yr) ? missing :
                  wtfe_decline_onset(sub_wtfe, break_yr)
 

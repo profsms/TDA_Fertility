@@ -1,17 +1,43 @@
 # ============================================================
 #  01_install_deps.jl
-#  Instantiate the Julia project and pre-compile all packages.
+#  Explicitly add and precompile all required packages.
 #  Run once before any other Julia script:
 #    julia --project=julia julia/01_install_deps.jl
 # ============================================================
 
 using Pkg
 
-# Activate the project environment (Project.toml lives in julia/)
 Pkg.activate(joinpath(@__DIR__))
 
-# Install all packages declared in Project.toml
+# Explicitly add every package by name to ensure resolution
+required = [
+    "CSV",
+    "DataFrames",
+    "Distances",
+    "Plots",
+    "Ripserer",
+    "PersistenceDiagrams",
+    "StatsBase",
+    "DotEnv",
+    "Random",
+    "Statistics",
+    "LinearAlgebra",
+]
+
+println("Checking and adding packages...")
+for pkg in required
+    if !haskey(Pkg.project().dependencies, pkg)
+        println("  Adding: ", pkg)
+        Pkg.add(pkg)
+    else
+        println("  Already present: ", pkg)
+    end
+end
+
+println("\nInstantiating project...")
 Pkg.instantiate()
+
+println("\nPrecompiling...")
 Pkg.precompile()
 
-println("All Julia dependencies installed and precompiled.")
+println("\nAll Julia dependencies installed and precompiled.")

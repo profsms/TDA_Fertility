@@ -112,16 +112,30 @@ eurostat_tfr <- if (!is.null(eurostat_tfr_raw)) {
 oecd_tfr_raw <- safe_read_csv(file.path(raw_dir, "oecd_tfr.csv"))
 
 oecd_tfr <- if (!is.null(oecd_tfr_raw)) {
-  oecd_tfr_raw |>
-    dplyr::rename_with(tolower) |>
-    dplyr::mutate(
-      year = as.integer(time),
-      tfr  = as.numeric(obsvalue)
-    ) |>
-    dplyr::select(iso3 = location, year, tfr) |>
-    dplyr::left_join(country_meta |> dplyr::select(iso3, name), by = "iso3") |>
-    dplyr::mutate(source = "OECD") |>
-    dplyr::select(iso3, name, year, tfr, source)
+  df_o <- dplyr::rename_with(oecd_tfr_raw, tolower)
+  message("OECD TFR columns: ", paste(names(df_o), collapse = ", "))
+  # New API uses "ref_area" and "obs_value" and "time_period";
+  # old API used "location", "obsvalue", "time"
+  loc_col  <- intersect(c("ref_area","location","country"), names(df_o))[1]
+  val_col  <- intersect(c("obs_value","obsvalue","value"),  names(df_o))[1]
+  time_col <- intersect(c("time_period","time","year"),     names(df_o))[1]
+
+  if (any(is.na(c(loc_col, val_col, time_col)))) {
+    message("Cannot parse OECD TFR columns -- skipping")
+    NULL
+  } else {
+    df_o |>
+      dplyr::mutate(
+        iso3 = as.character(.data[[loc_col]]),
+        year = as.integer(.data[[time_col]]),
+        tfr  = as.numeric(.data[[val_col]])
+      ) |>
+      dplyr::filter(iso3 %in% country_meta$iso3) |>
+      dplyr::left_join(country_meta |> dplyr::select(iso3, name), by = "iso3") |>
+      dplyr::mutate(source = "OECD") |>
+      dplyr::select(iso3, name, year, tfr, source) |>
+      tidyr::drop_na(tfr)
+  }
 } else NULL
 
 # Combine all sources; priority: HFD > Eurostat > OECD
@@ -166,12 +180,16 @@ if (!is.null(asfr_raw)) {
   # Detect ASFR value column: could be "asfr", "ASFR", "asfr1", etc.
   asfr_val_col <- cols_a[grepl("^asfr", cols_a, ignore.case = TRUE)][1]
   age_col      <- cols_a[grepl("^age",  cols_a, ignore.case = TRUE)][1]
-  yr_col_a     <- cols_a[grepl("^year", cols_a, ignore.case = TRUE)][1]
   cntry_col_a  <- cols_a[grepl("^country", cols_a, ignore.case = TRUE)][1]
+  # HFD asfrVH has a "cohort" column not "year" -- accept either
+  yr_col_a     <- intersect(c("year","cohort","period"), cols_a)[1]
 
   if (any(is.na(c(asfr_val_col, age_col, yr_col_a, cntry_col_a)))) {
     message("Cannot identify required ASFR columns -- skipping ASFR panel")
+    message("  Available columns: ", paste(cols_a, collapse = ", "))
   } else {
+    message("  ASFR using: year=", yr_col_a, " age=", age_col,
+            " asfr=", asfr_val_col, " country=", cntry_col_a)
     asfr_panel <- df_asfr |>
       dplyr::rename(asfr = !!asfr_val_col, age = !!age_col,
                     year = !!yr_col_a,     country = !!cntry_col_a) |>
@@ -189,8 +207,11 @@ if (!is.null(asfr_raw)) {
       tidyr::drop_na(iso3) |>
       dplyr::select(iso3, name, year, age_group, asfr)
 
-  readr::write_csv(asfr_panel, file.path(proc_dir, "asfr_panel.csv"))
-  message("Saved: data/processed/asfr_panel.csv  (", nrow(asfr_panel), " rows)")
+    readr::write_csv(asfr_panel, file.path(proc_dir, "asfr_panel.csv"))
+    message("Saved: data/processed/asfr_panel.csv  (", nrow(asfr_panel), " rows)")
+  }
+} else {
+  message("hfd_asfr.csv not found -- skipping ASFR panel")
 }
 
 # ============================================================
@@ -220,31 +241,56 @@ if (!is.null(mab_raw)) {
 # ============================================================
 message("Building contextual variables panel...")
 
-read_oecd_var <- function(file, value_col_new) {
+# Flexible reader: handles both old SDMX column names and new WB/OECD formats
+read_context_var <- function(file, value_col_new) {
   tryCatch({
-    readr::read_csv(file, show_col_types = FALSE) |>
-      dplyr::rename_with(tolower) |>
+    df <- readr::read_csv(file, show_col_types = FALSE) |>
+      dplyr::rename_with(tolower)
+    # Detect iso3 column
+    iso_col  <- intersect(c("iso3","location","ref_area","countryiso3code"), names(df))[1]
+    # Detect year column
+    yr_col   <- intersect(c("year","time","time_period","date"),             names(df))[1]
+    # Detect value column
+    val_col  <- intersect(c(value_col_new,"obs_value","obsvalue","value",
+                             "gdp_pc_ppp","female_lfpr","family_exp_pct_gdp"),
+                          names(df))[1]
+    if (any(is.na(c(iso_col, yr_col, val_col)))) {
+      warning(file, ": cannot identify columns. Got: ", paste(names(df), collapse=", "))
+      return(NULL)
+    }
+    df |>
       dplyr::mutate(
-        year      = as.integer(time),
-        !!value_col_new := as.numeric(obsvalue)
+        iso3           = as.character(.data[[iso_col]]),
+        year           = as.integer(.data[[yr_col]]),
+        !!value_col_new := as.numeric(.data[[val_col]])
       ) |>
-      dplyr::select(iso3 = location, year, !!value_col_new)
-  }, error = function(e) { warning(file, " not found"); NULL })
+      dplyr::select(iso3, year, !!value_col_new) |>
+      tidyr::drop_na()
+  }, error = function(e) { warning(file, " not found or unreadable: ", e$message); NULL })
 }
 
-gdp   <- read_oecd_var(file.path(raw_dir, "oecd_gdp_pc.csv"),           "gdp_pc_ppp")
-flfpr <- read_oecd_var(file.path(raw_dir, "oecd_flfpr.csv"),            "female_lfpr")
-socx  <- read_oecd_var(file.path(raw_dir, "oecd_family_expenditure.csv"),"family_exp_pct_gdp")
+gdp   <- read_context_var(file.path(raw_dir, "oecd_gdp_pc.csv"),           "gdp_pc_ppp")
+flfpr <- read_context_var(file.path(raw_dir, "oecd_flfpr.csv"),            "female_lfpr")
+socx  <- read_context_var(file.path(raw_dir, "oecd_family_expenditure.csv"),"family_exp_pct_gdp")
 
-context_panel <- purrr::reduce(
-  purrr::compact(list(gdp, flfpr, socx)),
-  dplyr::full_join, by = c("iso3", "year")
-) |>
-  dplyr::left_join(country_meta |> dplyr::select(iso3, name), by = "iso3") |>
-  dplyr::arrange(iso3, year)
+available_context <- purrr::compact(list(gdp, flfpr, socx))
+
+if (length(available_context) == 0) {
+  message("No contextual variables available -- saving empty context panel.")
+  context_panel <- tibble::tibble(iso3 = character(), year = integer(),
+                                  gdp_pc_ppp = numeric(), female_lfpr = numeric(),
+                                  family_exp_pct_gdp = numeric(), name = character())
+} else {
+  context_panel <- purrr::reduce(
+    available_context,
+    dplyr::full_join, by = c("iso3", "year")
+  ) |>
+    dplyr::left_join(country_meta |> dplyr::select(iso3, name), by = "iso3") |>
+    dplyr::arrange(iso3, year)
+}
 
 readr::write_csv(context_panel, file.path(proc_dir, "context_panel.csv"))
-message("Saved: data/processed/context_panel.csv")
+message("Saved: data/processed/context_panel.csv  (", nrow(context_panel), " rows)")
 
 # ============================================================
 #  5. Quick summary

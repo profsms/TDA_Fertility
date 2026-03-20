@@ -47,6 +47,15 @@ println("Countries with ASFR data: ", join(countries, ", "))
 #  7 columns for age groups)
 # ------------------------------------------------------------
 function asfr_matrix(sub_asfr::DataFrame, age_groups::Vector{String})
+    # Coerce year and asfr to concrete numeric types defensively
+    # parse with NA handling
+    parse_float(s) = (strip(string(s)) in ("NA","NaN","","missing")) ? NaN : parse(Float64, string(s))
+    parse_int(s)   = parse(Int, string(s))
+    sub_asfr = transform(sub_asfr,
+        :year      => (x -> parse_int.(x))   => :year,
+        :asfr      => (x -> parse_float.(x)) => :asfr,
+        :age_group => (x -> string.(x))       => :age_group
+    )
     years_all = sort(unique(sub_asfr.year))
     mat = Matrix{Float64}(undef, length(years_all), length(age_groups))
     fill!(mat, NaN)
@@ -54,7 +63,7 @@ function asfr_matrix(sub_asfr::DataFrame, age_groups::Vector{String})
         yr_rows = filter(:year => ==(yr), sub_asfr)
         for (j, ag) in enumerate(age_groups)
             ag_rows = filter(:age_group => ==(ag), yr_rows)
-            mat[i, j] = isempty(ag_rows) ? NaN : first(ag_rows.asfr)
+            mat[i, j] = isempty(ag_rows) ? NaN : Float64(first(ag_rows.asfr))
         end
     end
     return years_all, mat

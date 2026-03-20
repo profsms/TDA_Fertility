@@ -158,7 +158,7 @@ cnames = [first(filter(:iso3 => ==(c), all_qt)).name for c in countries]
 p_heat = heatmap(years_all, cnames, div_mat,
                  xlabel="Year",
                  title="Quantum–tempo WTFE divergence",
-                 colour=:RdYlGn_r, size=(900, 400))
+                 colour=:RdYlGn, size=(900, 400))
 savefig(p_heat, joinpath(fig_dir, "quantum_tempo_heatmap.pdf"))
 savefig(p_heat, joinpath(fig_dir, "quantum_tempo_heatmap.png"))
 println("Saved: quantum_tempo_heatmap.pdf / .png")
