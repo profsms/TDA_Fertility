@@ -2,7 +2,7 @@
 
 > **Replication code for:**
 > *A Topological Indicator for Fertility Regime Dynamics*
-> Stanislaw M. S. Halkiewicz, Kornelia Kozaczewska, Jean-Marc Freyermuth
+> Stanislaw M. S. Halkiewicz, Kornelia Kozaczewska
 > *(working paper, 2025)*
 
 ---
